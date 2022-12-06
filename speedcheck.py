@@ -3,9 +3,13 @@
 import usb.core
 import usb.util
 import time
+import threading
+import concurrent.futures
+import random
 
 TOTALSIZE = 2*1024*1024
-XFERSIZE  = 2048
+INSIZE = 64
+OUTSIZE = 32
 
 # find our device
 dev = usb.core.find(idVendor=0xcafe, idProduct=0x4010)
@@ -42,17 +46,32 @@ epin  = usb.util.find_descriptor(
 assert epout is not None
 assert epin  is not None
 
-done = 0
 start = time.perf_counter()
-while done < TOTALSIZE:
-    done = done + epout.write(b'X' * XFERSIZE)
-stop = time.perf_counter()
-print("Host -> Device: %.2f kBytes/s" % (done/(stop-start)/1024))
 
-done = 0
-start = time.perf_counter()
-while done < TOTALSIZE:
-    done = done + len(epin.read(XFERSIZE))
-stop = time.perf_counter()
-print("Device -> Host: %.2f kBytes/s" % (done/(stop-start)/1024))
+def read_thread():
+    donein = 0
+    while donein < (TOTALSIZE * 2)/INSIZE:
+        donein = donein + len(epin.read(64))
+    stopin = time.perf_counter()
+    return stopin
 
+def write_thread():
+    doneout = 0
+    while doneout < TOTALSIZE/OUTSIZE:
+        doneout = doneout + epout.write(b'\xff' * random.randint(32,64))
+        time.sleep(0.0001)
+    stopout = time.perf_counter()
+    return stopout
+
+loop = 0
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    while True:
+        loop += 1
+        start = time.perf_counter()
+        readt = executor.submit(read_thread,)
+        writet = executor.submit(write_thread,)
+        intime = readt.result()
+        outtime = writet.result()
+        print("Loop %d" % loop)
+        print("Device -> Host: %.2f kBytes/s" % ((TOTALSIZE * 2)/INSIZE/(intime-start)/1024))
+        print("Host -> Device: %.2f kBytes/s" % (TOTALSIZE/OUTSIZE/(outtime-start)/1024))

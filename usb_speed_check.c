@@ -86,27 +86,32 @@ bool tud_vendor_control_xfer_cb(uint8_t rhport, uint8_t stage, tusb_control_requ
 }
 
 int main() {
-   
-    static char buffer[8192]; // larger than USB fifo
-        
+
+    static char txbuffer[8192]; // larger than USB fifo
+    static char rxbuffer[1024];
+    uint32_t rng, len;
     // Init USB
     board_init();
     tusb_init();
-    
+    // max bit stuff for half of it
+    memset(txbuffer, 0xff, sizeof(txbuffer)/2);
     while (1)
     {
         tud_task();
-        
+        rng = (time_us_32() ^ 0x55) & 0x3f;
+        rng = (rng >> 4) | ((rng & 0xf) << 4); // up to 64us
+        len = (time_us_32() % 64) | 0x30; // 48-63 bytes
         if (usb_connected && tud_vendor_available()) {
             // read and discard
-            tud_vendor_read(buffer, sizeof(buffer));
+            tud_vendor_read(rxbuffer, sizeof(rxbuffer));
         }
         
         if (usb_connected && tud_vendor_write_available()) {
             // write as much data as possible
-            tud_vendor_write(buffer, tud_vendor_write_available());
+            busy_wait_us(rng);
+            len = MIN(len, tud_vendor_write_available());
+            tud_vendor_write(txbuffer, len);
         }
-        
     }
 
     return 0;

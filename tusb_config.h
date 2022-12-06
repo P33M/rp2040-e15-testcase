@@ -103,8 +103,8 @@
 
 // Vendor FIFO size of TX and RX
 // If not configured vendor endpoints will not be buffered
-#define CFG_TUD_VENDOR_RX_BUFSIZE 4096
-#define CFG_TUD_VENDOR_TX_BUFSIZE 4096
+#define CFG_TUD_VENDOR_RX_BUFSIZE 512
+#define CFG_TUD_VENDOR_TX_BUFSIZE 512
 
 
 #ifdef __cplusplus
